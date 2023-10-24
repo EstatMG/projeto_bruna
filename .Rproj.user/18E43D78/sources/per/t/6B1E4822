@@ -1,0 +1,32 @@
+{
+    "id": "6B1E4822",
+    "path": "~/UFMG/EstatMG/projeto_bruna-master/relatorio.qmd",
+    "project_path": "relatorio.qmd",
+    "type": "quarto_markdown",
+    "hash": "1501165147",
+    "contents": "",
+    "dirty": false,
+    "created": 1698151743158.0,
+    "source_on_save": false,
+    "relative_order": 1,
+    "properties": {
+        "rmdVisualMode": "false",
+        "rmdVisualWrapConfigured": "true",
+        "source_window_id": "",
+        "Source": "Source",
+        "docOutlineVisible": "1",
+        "rmdVisualModeLocation": "2:0",
+        "cursorPosition": "164,0",
+        "scrollLine": "155",
+        "rmdVisualCollapsedChunks": "",
+        "docOutlineSize": "107"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1698159632,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1698159632211,
+    "read_only": false,
+    "read_only_alternatives": []
+}

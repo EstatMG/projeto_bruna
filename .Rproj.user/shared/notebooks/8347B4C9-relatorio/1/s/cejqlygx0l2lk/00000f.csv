@@ -1,0 +1,3 @@
+"0","for(i in seq_along(dfs)){"
+"0","  dfs[[i]] <- limpa_indices(dfs[[i]])"
+"0","}"

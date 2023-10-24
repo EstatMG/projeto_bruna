@@ -1,0 +1,2 @@
+"0","nh <- ceiling(Wh*3781)"
+"0","df_resumo<- data.frame(""Estratos""=dados$Podcast, ""Tamanho de amostra""=nh)"

@@ -85,6 +85,8 @@ df_rs <- dfs$df_rs
 df_tw <- dfs$df_tw
 ```
 
+
+
 # Determinação do tamanho da amostra
 
 Para determinar o tamanho da mostra usaremos a seguinte metodologia: primeiro, calcularemos o tamanho total da amostra, sem considerar os estratos, por meio do plano AAS e, em seguida, usaremos o plano amostral AEpr para determinar o tamanho amostral de cada estrato. Convém resslatar que o referido AAS é subdivido em outras duas subcategorias: a primeira sendo amostragem aleatórias simples com reposição (AASc) e a segunda amostragem aleatória simples sem reposição (AASs). No primeiro caso, temos que a cada unidade amostral aleatoriamente selecionada, ela é reposta na população podendo ser selecionada novamente nas estapas seguintes. Tal procedimento garante que cada unidade amostral coletada seja **independente**. No plano AASs, por outro lado, ao sortearmos um elemento da população, este não poderá ser sorteado novamente nas etapas seguintes, de modo que, as retiradas não são independetes pois a probabilidade de sortear o elemento seguinte é alterada pelo elemento sorteado anteriormente. De modo geral, a escolha por um procedimento ou outro fica a critério do pesquisador. O plano AASc apresenta a importante propriedade da **independência** o que pode facilitar enormemente a realização de inferências futuras. Por outro lado, o efeito do planejamento (EPA), medida usada para quantificar a eficácia de determinado plano amostra, da AASs é sempre melhor que o AASc, com excessão do caso $n=1$. Desse modo, cabe ao pesquisador pesar as vantagens e desvantgens, para fazer sua escolha. Abaixo, escrevemos a definição do EPA
@@ -161,3 +163,5 @@ df_resumo<- data.frame("Estratos"=dados$Podcast, "Tamanho de amostra"=nh)
 A cliente aceitou um erro de 3.70037, que resulta em um tamanho amostra de 3781 que, arrendodado par acima quando fazemos a conta com as proporções, resulta em 3852.A tabela **"Tamanho amostral de cada grupo"**, do google drive, mostra quanto de tamanho amostral devemos returar de cada podcast.
 
 # Coleta das amostras
+
+
