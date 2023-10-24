@@ -1,0 +1,3 @@
+"0","nh_col_ts1 <- ceiling(Wh_col*4822)"
+"0","df_resumo1_ts1 <- data.frame(""Estratos""=colnames(dados_numeros), ""Tamanho de amostra""=nh_col_ts1)"
+"0","kable(df_resumo1_ts1)"

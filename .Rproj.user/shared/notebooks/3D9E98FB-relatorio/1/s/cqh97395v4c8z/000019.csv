@@ -1,0 +1,7 @@
+"0","#| label: tbl-tab4"
+"0","#| tbl-cap: ""Resultados pela abordagem 2"""
+"0","#| layout-ncol: 1"
+"0","#| layout-nrow: 1"
+"0","nh2_col <- ceiling(Wh_col*df2$tamanhos2[1])"
+"0","df_resumo2 <- data.frame(""Estratos""=colnames(dados_numeros), ""Tamanho de amostra""=nh2_col)"
+"0","kable(df_resumo2)"

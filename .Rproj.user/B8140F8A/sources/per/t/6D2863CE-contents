@@ -1,0 +1,265 @@
+---
+title: "Relatório Bruna"
+execute: 
+  echo: false
+  warning: false
+format: pdf
+editor: visual
+---
+
+# Bibliotecas
+
+```{r}
+library(readxl)
+library(kableExtra)
+```
+
+```{r}
+# Declaração de funções 
+
+```
+
+# Saneamento dos dados
+
+```{r}
+dados <- read_excel("data/Contagem podcasts - considerar este.xlsx")
+dados <- dados[-nrow(dados), -ncol(dados)]
+dados <- dados[,-1]
+dados_numeros <- dados[,-1]
+```
+
+# Determinação do tamanho da amostra
+
+Para determinar o tamanho da mostra usaremos a seguinte metodologia: primeiro, calcularemos o tamanho total da amostra, sem considerar os estratos, por meio do plano AAS e, em seguida, usaremos o plano amostral AEpr para determinar o tamanho amostral de cada estrato. Convém resslatar que o referido AAS é subdivido em outras duas subcategorias: a primeira sendo amostragem aleatórias simples com reposição (AASc) e a segunda amostragem aleatória simples sem reposição (AASs). No primeiro caso, temos que a cada unidade amostral aleatoriamente selecionada, ela é reposta na população podendo ser selecionada novamente nas estapas seguintes. Tal procedimento garante que cada unidade amostral coletada seja **independente**. No plano AASs, por outro lado, ao sortearmos um elemento da população, este não poderá ser sorteado novamente nas etapas seguintes, de modo que, as retiradas não são independetes pois a probabilidade de sortear o elemento seguinte é alterada pelo elemento sorteado anteriormente. De modo geral, a escolha por um procedimento ou outro fica a critério do pesquisador. O plano AASc apresenta a importante propriedade da **independência** o que pode facilitar enormemente a realização de inferências futuras. Por outro lado, o efeito do planejamento (EPA), medida usada para quantificar a eficácia de determinado plano amostra, da AASs é sempre melhor que o AASc, com excessão do caso $n=1$. Desse modo, cabe ao pesquisador pesar as vantagens e desvantgens, para fazer sua escolha. Abaixo, escrevemos a definição do EPA
+
+$$EPA=\frac{Var_{AASs}[\overline{y}]}{Var_{AASc}[\overline{y}]}=\frac{\frac{(1-f)S^2}{n}}{\frac{\sigma^2}{n}}=\frac{N-n}{N-1}$$ onde notamos que $EPA\leq1$ sempre, de modo que o numerador é menor que o denominador, implicando que o plano AASs sempre é mais eficiente (variância) que o AASc.
+
+Ademais, efetuaremos o cálculo do tamanho amostral de dois modos: o primeiro será considerando as colunas como estratos e o segundo, as linhas. Isso foi feito para que pudéssemos dar opções ao pesquisador, de modo que ele possa nos informar quais desses elementos são de fato os estratos de sua pesquisa.
+
+## Considerando as colunas como estratos
+
+### Abordagem 1: Amostragem Aleatória Simples com reposição (AASc) em conjunto com Amostragem Estratificada Proporcional (AEpr)
+
+Nessa abordagem, inicialmente calcularemos o tamanho total amostral por meio do plano AASc, dado pela fórmula
+
+$$n_{total}=\frac{\sigma^2_{total}}{D}$$ onde $D=\frac{B^2}{z_{\alpha}^2}$ é uma função do erro $B$ escolhido, fixado um nível de confiança $z_{\alpha}$ e a variância total é a soma das variâncias de cada estrato, isto é
+
+$$\sigma^2_{total}=\frac{\sum_{h=1}^H\sigma^2_h}{N}$$ Além disso, a variância de cada estrato é dada pelo plano AE como se segue
+
+$$\sigma^2_h=\frac{\sum_{i=1}^{N_h}}{N_h}$$ Sobre a $D$ é calculada a partir de um erro escolhido pelo pesquisador, que chamamos de $B$ ponderado por um valor dado pelo nível de significância desejado $\alpha$ que, em geral, é usado o valor 5%. É importante salientar que quanto maior o erro que se está disposto a cometer, maior o tamanho amostral necessário. Contudo, se for possível escolher um erro maior, o tamanho da amostra também diminui consideravelmente. Contudo, ao fazer essa escolha, perde-se precisão em suas análises e inferências. É uma troca que se faz para que seja possível reduzir o tamanho amostral. Tal escolha fica a critério do pesquisador, e sua disposição em trabalhar com uma amostra maior ou menor.
+
+Tendo calculado o tamanho total da amostra pelo plano AASc, conseguimos determinar o tamanho de amostra necessário dentro de cada grupo usando o plano AEpr, dado pela fórmula
+
+$$n_h=n\frac{N_h}{N}=nW_h$$,
+
+em que $W_h$ é o peso que cada grupo possui na população.
+
+```{r}
+N <- sum(dados_numeros)
+```
+
+```{r}
+# Calculando com os estratos sendo colunas
+Nh_col <- numeric(ncol(dados_numeros))
+for(i in seq_along(dados_numeros)){
+  Nh_col[i] <- sum(dados_numeros[,i])
+}
+Wh_col <- Nh_col/N
+sigma2_h_col <- numeric(ncol(dados_numeros))
+for(i in seq_along(dados_numeros)){
+  sigma2_h_col[i] <- var(dados_numeros[,i])
+}
+sigma2_total_col <- sum(sigma2_h_col)
+```
+
+```{r}
+#| label: tbl-tab1
+#| tbl-cap: "Erro e tamanho da amostra"
+#| layout-ncol: 1
+#| layout-nrow: 1
+alpha <- 0.05
+z <- abs(qnorm(alpha/2))
+B <- seq(0, 100, length = 10000)
+D <- (B/z)^2
+
+tamanhos1 <- numeric(10000)
+for(i in seq_along(B)){
+  D <- (B[i]/z)^2
+  ni1 <- ceiling(sigma2_total_col/D)
+  if(ni1 < N){
+    tamanhos1[i] <- ni1
+  }
+}
+
+df1 <- data.frame(B = B[tamanhos1 > 0], tamanhos1 = tamanhos1[tamanhos1 > 0])
+kable(head(df1))
+
+```
+
+```{r}
+#| label: tbl-tab2
+#| tbl-cap: "Rsultados pela abordagem 1"
+#| layout-ncol: 1
+#| layout-nrow: 1
+nh_col <- ceiling(Wh_col*df1$tamanhos1[1])
+df_resumo1 <- data.frame("Estratos"=colnames(dados_numeros), "Tamanho de amostra"=nh_col)
+kable(df_resumo1)
+```
+
+Por meio de simulação computacional, obtivemos que o erro mínimo para calcular o tamanho da amostra é 3.770377 resultando em um tamanho amostral de 33922. A @tbl-tab2 mostra o tamanho amostral dentro de cada grupo, ao passo que a @tbl-tab1 mostra a redução do tamanho amostral necessário, a medida que o erro escolhido aumenta.
+
+Por exemplo, para um erro de 10.001000, o tamanho de amostra seria 4822, gerando a tabela abaixo	
+
+```{r}
+nh_col_ts1 <- ceiling(Wh_col*4822)
+df_resumo1_ts1 <- data.frame("Estratos"=colnames(dados_numeros), "Tamanho de amostra"=nh_col_ts1)
+kable(df_resumo1_ts1)
+```
+
+
+### Abordagem 2: Amostragem Aleatória Simples sem reposição (AASs) em conjunto com Amostragem Estratificada Proporcional (AEpr)
+
+nessa segunda abordagem, todo o procedimento para calcular o tamanho da amostra é análogo. A única diferença será no cálculo do $n_{total}$ pois agora ele sera determinado pelo plano AASs, dado pela fórmula
+
+$$n_{total}=\frac{1}{\frac{D}{\sigma_{total}^2}+\frac{1}{N}}$$
+
+```{r}
+#| label: tbl-tab3
+#| tbl-cap: "Erro e tamanho da amostra"
+#| layout-ncol: 1
+#| layout-nrow: 1
+alpha <- 0.05
+z <- abs(qnorm(alpha/2))
+B <- seq(0, 100, length = 10000)
+D <- (B/z)^2
+
+tamanhos2 <- numeric(10000)
+for(i in seq_along(B)){
+  D <- (B[i]/z)^2
+  ni2 <- ceiling((1)/((D/sigma2_total_col)+(1/N)))
+  if(ni2 < N){
+    tamanhos2[i] <- ni2
+  }
+}
+
+df2 <- data.frame(B = B[tamanhos2 > 0], tamanhos2 = tamanhos2[tamanhos2 > 0])
+kable(head(df2))
+```
+
+```{r}
+#| label: tbl-tab4
+#| tbl-cap: "Resultados pela abordagem 2"
+#| layout-ncol: 1
+#| layout-nrow: 1
+nh2_col <- ceiling(Wh_col*df2$tamanhos2[1])
+df_resumo2 <- data.frame("Estratos"=colnames(dados_numeros), "Tamanho de amostra"=nh2_col)
+kable(df_resumo2)
+```
+
+A @tbl-tab4 mostra o tamanho amostral de cada estrato quando usamos o tamanho amostral obtido pelo erro mínimo na @tbl-tab3 que é 34058. Esse tamanho pode diminuir se o pesquisador estiver disposta a aumentar o erro.
+
+Tentando diminuir o tamanho da amostra, para um erro de 10.001000, tem-se uma tamanho de 4224, gerando a tabela abaixo
+
+```{r}
+nh_col_ts2 <- ceiling(Wh_col*4224)
+df_resumo1_ts2 <- data.frame("Estratos"=colnames(dados_numeros), "Tamanho de amostra"=nh_col_ts2)
+kable(df_resumo1_ts2)
+```
+
+
+## Considerando as linhas como estratos
+
+### Abordagem 1: Amostragem Aleatória Simples com reposição (AASc) em conjunto com Amostragem Estratificada Proporcional (AEpr)
+
+```{r}
+Nh_linha <- numeric(nrow(dados_numeros))
+for(i in 1:nrow(dados_numeros)){
+  Nh_linha[i] <- sum(dados_numeros[i,])
+}
+Wh_linha <- Nh_linha/N
+sigma2_h_linha <- numeric(nrow(dados_numeros))
+for(i in 1:nrow(dados_numeros)){
+  sigma2_h_linha[i] <- var(as.matrix(dados_numeros)[i,])
+}
+sigma2_total_linha <- sum(sigma2_h_linha)
+```
+
+
+```{r}
+alpha <- 0.05
+z <- abs(qnorm(alpha/2))
+B <- seq(0, 100, length = 10000)
+
+tamanhos1_linha <- numeric(10000)
+for(i in seq_along(B)){
+  D <- (B[i]/z)^2
+  ni1_linha <- ceiling(sigma2_total_linha/D) 
+  if(ni1_linha < N){
+    tamanhos1_linha[i] <- ni1_linha
+  }
+}
+
+df1_linha <- data.frame(B = B[tamanhos1_linha > 0], tamanhos1_linha = tamanhos1_linha[tamanhos1_linha > 0])
+kable(head(df1_linha))
+```
+
+O erro mínimo encontrado foi 15.36154 resultando em um tamanho de amostra de 34048.
+Vale a observação de que o uso desse plano amostral, neste caso não é bom, pois são necessários erros muito grandes para reduzir o tamanho da amostra.
+
+```{r}
+nh_linha <- ceiling(Wh_linha*df1_linha$tamanhos1_linha[1])
+df_resumo1_linha <- data.frame("Estratos"=dados$Podcast, "Tamanho de amostra"=nh_linha)
+kable(head(df_resumo1_linha, n = 10))
+```
+
+### Abordagem 2: Amostragem Aleatória Simples com reposição (AASs) em conjunto com Amostragem Estratificada Proporcional (AEpr)
+
+```{r}
+matriz_dados <- as.matrix(dados_numeros)
+colnames(matriz_dados) <- NULL
+vetor_dados <- as.vector(matriz_dados)
+```
+
+
+```{r}
+Nh_linha <- numeric(nrow(dados_numeros))
+for(i in 1:nrow(dados_numeros)){
+  Nh_linha[i] <- sum(matriz_dados[i,])
+}
+Wh_linha <- Nh_linha/N
+sigma2_h_linha <- numeric(nrow(dados_numeros))
+for(i in 1:nrow(dados_numeros)){
+  sigma2_h_linha[i] <- var(matriz_dados[i,])
+}
+sigma2_total_linha <- var(vetor_dados)
+```
+
+
+```{r}
+alpha <- 0.05
+z <- abs(qnorm(alpha/2))
+B <- seq(0, 1000, length = 10000)
+D <- (B/z)^2
+
+tamanhos2_linha <- numeric(10000)
+for(i in seq_along(B)){
+  D <- (B[i]/z)^2
+  ni2_linha <- ceiling((1)/((D/sigma2_total_linha)+(1/N))) 
+  if(ni2_linha < N){
+    tamanhos2_linha[i] <- ni2_linha
+  }
+}
+
+df2_linha <- data.frame(B = B[tamanhos2_linha > 0], tamanhos2_linha = tamanhos2_linha[tamanhos2_linha > 0])
+kable(head(df2_linha))
+```
+
+O erro mínimo obtido foi 0.090009 resultando em um tamanho de amostra de 34059
+
+```{r}
+nh2_linha <- ceiling(Wh_linha*df2_linha$tamanhos2_linha[1])
+df_resumo2_linha <- data.frame("Estratos"=dados$Podcast, "Tamanho de amostra"=nh2_linha)
+kable(head(df_resumo2_linha, n = 10))
+```
+
+

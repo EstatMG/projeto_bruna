@@ -1,0 +1,3 @@
+"0","nh_linha <- ceiling(Wh_linha*df1_linha$tamanhos1_linha[1])"
+"0","df_resumo1_linha <- data.frame(""Estratos""=dados$Podcast, ""Tamanho de amostra""=nh_linha)"
+"0","kable(head(df_resumo1_linha, n = 10))"

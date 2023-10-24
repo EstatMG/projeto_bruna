@@ -1,0 +1,492 @@
+---
+title: "Relatório"
+author: "Bruno Carvalho Silva Ribeiro"
+header-includes:
+  - \usepackage{float}
+  - \floatplacement{figure}{H}  #make every figure with caption = h, this was the fix
+  - \floatplacement{table}{H}
+execute: 
+  warning: false
+  echo: false
+  message: false
+format: 
+  pdf:
+    number-sections: true
+    number-depth: 3
+    fig-pos: 'H'
+    fig-height: 5
+    
+editor: visual
+---
+
+```{r echo=FALSE, message = FALSE}
+# Carregando pacotes
+library(rstan)
+library(coda)
+library(purrr)
+library(kableExtra)
+library(plotrix)
+```
+
+```{r}
+# Configurações Iniciais
+rm(list=ls(all=TRUE))
+rstan_options(auto_write=TRUE)
+options(mc.cores = parallel::detectCores())
+set.seed(1)
+```
+
+```{r}
+# Declaração de funções
+
+
+faz_tab_bayes <- function(samp, real, q){
+  
+  # recebe um objeto do tipo samp 
+  # real é um vetor com os valores reais dos parametros
+  # q é o tamanho do vetor de betas
+  aux = cbind(samp$beta)
+  me = apply(aux, 2, mean)   # média
+  md = apply(aux, 2, median) # mediana
+  sd = apply(aux, 2, sd)     # desvio padrão
+  aux = as.mcmc(aux)
+  hpd = HPDinterval(aux)
+  tab = cbind(unlist(real), me, md, sd, hpd[,'lower'], hpd[,'upper'], hpd[,'upper'] - hpd[,'lower'])
+  rownames(tab) = c(paste0('beta', 0:(q-1)))
+  colnames(tab) = c('true', 'mean', 'median', 's.d.', 'HPD_inf', 'HPD_sup', 'Amplitude')
+  res <- round(tab, 4)              # mostrar saída com 4 casas decimais 
+  return(res)
+  
+}
+
+
+faz_tab_classica <- function(mod, q){
+  # mod é um glm
+  # q é o tamanho do vetor de betas
+  tab_classica <- summary(mod)$coefficients
+  rownames(tab_classica) <- c(paste0('beta', 0:(q-1)))
+  res <- round(tab_classica, 4)
+  return(res)
+}
+
+
+gera_bayes <- function(n, prob_X2, logit = TRUE, seed_number){
+  # path_stanfile deve ser do tipo "./Stan/Regprobit.stan"
+  
+  set.seed(seed_number)
+
+  if(logit == TRUE){
+    
+    # n <- 200
+    beta <- c(1.5, 0.5, -0.5, 1.0, -1.0)
+    q <- length(beta)
+    real <- list(beta)
+    names(real) <- c('beta')
+    
+    x <- array(1, c(n, q))
+    
+    x[,2] <- rbinom(n, 1, prob_X2)
+    
+    
+    for(i in 3:q){x[,i] <- runif(n, -1, 1)}
+    
+    eta <- x %*% as.matrix(beta) |> as.vector()
+    
+    theta <- exp(eta) / (1 + exp(eta))
+    
+    y <- numeric(n)
+    for(i in 1:n){y[i] <- rbinom(1, 1, theta[i])}
+    
+    m_beta <- rep(0, q)
+    s_beta <- 10*diag(q)
+    
+    data <- list(
+      n = n, 
+      q = q, 
+      y = y, 
+      x = x,
+      m_beta = m_beta,
+      s_beta = s_beta
+    )
+    
+    pars <- c("beta")
+    
+    # Lista de sementes de inicialização (2 cadeias):
+    init = list()
+    init[[1]] <- list(beta=rep(0,q))
+    init[[2]] <- list(beta=runif(q,-1,1))
+    
+    iter = 2000
+    warmup = 1000
+    chains = 2
+    
+    out <- stan(file = "./Stan/Reglogit.stan", data = data,
+                   iter = iter, warmup = warmup, chains = chains,
+                   pars = pars, init = init, verbose = FALSE)
+    
+    res <- list(
+      output = out,
+      real = real, 
+      x = x, 
+      y = y, 
+      eta = eta, 
+      theta = theta
+    )
+    
+  }else{
+    
+    # n <- 200
+    beta <- c(1.5, 0.5, -0.5, 1.0, -1.0)
+    q <- length(beta)
+    real <- list(beta)
+    names(real) <- c('beta')
+    
+    x <- array(1, c(n, q))
+    
+    x[,2] <- rbinom(n, 1, prob_X2)
+    
+    
+    for(i in 3:q){x[,i] <- runif(n, -1, 1)}
+    
+    eta <- x %*% as.matrix(beta) |> as.vector()
+    
+    theta <- pnorm(eta)
+    
+    y <- numeric(n)
+    for(i in 1:n){y[i] <- rbinom(1, 1, theta[i])}
+    
+    m_beta <- rep(0, q)
+    s_beta <- 10*diag(q)
+    
+    data <- list(
+      n = n, 
+      q = q, 
+      y = y, 
+      x = x,
+      m_beta = m_beta,
+      s_beta = s_beta
+    )
+    
+    pars <- c("beta")
+    
+    # Lista de sementes de inicialização (2 cadeias):
+    init = list()
+    init[[1]] <- list(beta=rep(0,q))
+    init[[2]] <- list(beta=runif(q,-1,1))
+    
+    iter = 2000
+    warmup = 1000
+    chains = 2
+    
+    out <- stan(file = "./Stan/Regprobit.stan", data = data,
+                   iter = iter, warmup = warmup, chains = chains,
+                   pars = pars, init = init, verbose = FALSE)
+    
+    res <- list(
+      output = out,
+      real = real, 
+      x = x, 
+      y = y, 
+      eta = eta, 
+      theta = theta
+    )
+    
+  }
+  
+  return(res)
+  
+}
+
+
+cria_traceplot <- function(samp, real, index_samp, index_beta){
+  # samp é uma lista em que cada elemento é uma amostra diferente
+  # real é o vetor com os verdadeiros valores dos parâmetros
+  # index acessa qual elemento de cada um desses parâmetros você quer acessar
+
+  { plot( samp[[index_samp]]$beta[,index_beta], type = 'l', cex.lab = 1.5, cex.axis = 1.5,
+        xlab = 'iterações', ylab = 'beta0',
+        main = paste0("Traceplot de beta", (index_beta-1)), col = 'blue') 
+  abline( h = real$beta[index_beta], lwd = 5, col = 'red') }
+}
+
+
+calcula_ic <- function(mod, betas, conf_level = 0.95){
+  # Usado apenas para o método frequentista 
+  
+  tab_info <- summary(mod)$coefficients
+  estimatives <- tab_info[,1]
+  standard_error <- tab_info[,2]
+  z <- abs(qnorm((1-conf_level)/2))
+  li <- estimatives - z*standard_error  
+  ls <- estimatives + z*standard_error
+  res <- list(li = li, ls = ls)
+  
+  return(res)
+}
+
+
+```
+
+# Introdução
+
+A regressão logística é um tipo de regressão muito comum e importante. Suas aplicações são diversas sendo um das mais populares o uso para construir classificadores em modelos de machine learning. Na regressão logística tem-se que a variável que se quer explicar é binária, isto é, assume apenas os valores 0 ou 1. Desse modo, um modelo de regressão logística é construido em três tapas como se segue: $$Y_i = \beta_0+\beta_1X_{1i}+...+\beta_kX_{ki}$$
+
+1.  $Y_i\text{~}Bernoulli(\theta_i), 0<\theta_i<1$
+
+2.  $\theta_i=\frac{e^{\eta_i}}{1+e^{\eta_i}}$
+
+3.  $\eta_i = \beta_0+\beta_1X_{1i}+...+\beta_kX_{ki}$
+
+A função especificada em 2 é chamada função de ligação. Ela se faz necessária devido ao seguinte problema: $\theta_i\in(0,1)$ e $\eta_i\in R$. Logo, ambos assumem valores diferentes e, portanto, não podem ser igualados como fazemos na equação do modelo. A solução para isso é definir uma função de ligação que permitirá validar a igualdade do modelo. A solução usada é igualar $\eta_i = log(\frac{\theta_i}{{1-\theta1}})$ e assim, por meio de manipulação algébrica, chega-se a $\theta_i=\frac{e^{\eta_i}}{1+e^{\eta_i}}$. Em especial a função apresentada em 2 recebe o nome de logit. Contudo, existe a possibilidade de se usar outra função de ligação, chamada probit, que também será estudada neste relatório. Ela é definida como se segue: $\theta_i=\Phi_{N(0,1)}(\eta_i)$ em que $\Phi$ denota a função de distribuição acumulada (FDA) de uma normal-padrão.
+
+Outro fato a se notar é que a equação em 3 recebe o nome de preditor linear.
+
+# Metodologia
+
+Este relatório possui o intuito de realizar estude de dados simulados. Para tal fim, iremos nos ater ao modelo de regressão:
+
+$$Y_i=\beta_0+\beta_1X_{1i}+\beta_2X_{2i}+\beta_3X_{3i}+\beta_4X_{4i}$$.
+
+Inicialmente, definimos o vetor com os valores verdadeiros de cada $\beta_i$. Essa escolha pode ser qualquer número real e, para os fins deste relatório, foi definido $\vec{\beta}=(1.5,0.5,-0.5,1.0,-1.0)$. Em um problema real, não se teria acesso a esses valores, a menos que se tenha acesso a todos os elementos da população. Em seguida, prossegue-se para a geração das covariáveis. Para essas tem-se que $X_1$ foi gerada de uma distribuição binomial com parâmetros n e probabilidade de sucesso 0.5, inicialmente. Posteriorimente, esses valores serão alterados e faremos a devida indicação. As demais covariáveis foram geradas de uma distribuição uniforme variando de -1 até 1. Logo, a matriz de covariáveis, com dimensão $nxq$, terá apenas ums em sua primeira coluna, na segunda terá zeros e ums, e nas demais valores reais entre -1 e 1.
+
+A inferência bayesiana usa cadeias para estimar os parâmetros. Para esse fim, foi utilizado o pacote R stan. Tal pacote gera cadeias por meio do método MCMC (Monte Carlo Markov Chain). É preciso informar ao programa a configuração das cadeias, o que chamamos de setup do MCMC. Assim, em todas as simulações usamos 2000 iterações com 2 cadeias para cada parâmetro e definimos um tamanho de *warmup* de 1000. Além disso, os valores iniciais da cadeia foram definidos como um vetor nulo de tamanho 5, para a primeira cadeia, e 5 valores gerados de uma uniforme(-1, 1).
+
+```{r cache=TRUE}
+# Gerando dados
+n <- list(200, 1000, 200, 200) # tarefa1, tarefa1, tarefa2, tarefa 3, tarefa 4
+prob_X2 <- list(0.5, 0.5, 0.1, 0.5)
+logit <- list(TRUE, TRUE, TRUE, FALSE)
+
+output <- pmap(list(n, prob_X2, logit), gera_bayes, 1)
+
+samp <- vector(mode = "list", length = length(output))
+for(i in seq_along(samp)){samp[[i]] <- extract(output[[i]]$output)}
+```
+
+# Estudo Simulado
+
+## Bayesiano vs Bayesiano
+
+Resumidamente, esse relatório se propõe a concluir x objetivos:
+
+1.  Estudar o efeito do tamanho da amostra na qualidade da estimação Bayesiana
+
+2.  Estudar o desbalanceamente da covariável $X_1$, geradada de uma distriubuição binomial(n, p).
+
+3.  Comparar a estimação Bayesiana com a frequentista
+
+4.  Comparar a estimação Bayesiana usando logit.
+
+Para cumprir essas finalidades, foram gerados dados em 4 cenários diferentes. Nos três primeiros cenários usou-se a função de ligação logit sendo que, nos dois primeiros, foi alterado apenas o tamanho da amostra de 200 para 1000 e, no tericeiro, a probabilidade de sucesso de 0.5 para 0.1 no cenário 3, mantendo n = 200. No quarto cenário, fixou-se o tamanho da amostra em 200 e usou-se a função de ligação probit, com P(X1=x)=0.5. A @tbl-tab_configs contém um resumo de todas as configurações usadas em cada cenário.
+
+```{r}
+#| label: tbl-tab_configs
+#| tbl-cap: "Tabelas com resumo das configurações de cada cenário simulado"
+
+tab_configs <- data.frame(
+  index = 1:length(output),
+  n = c(200, 1000, 200, 200),
+  prob_sucesso = c(0.5, 0.5, 0.1, 0.5),
+  eh_logit = c(rep("sim",3), "não")
+)
+colnames(tab_configs) <- c("Cenário", "Tamanho da amostra", "P(X1=x)", "É link logit?")
+
+kbl(tab_configs, booktabs = T)%>% 
+      kable_styling(latex_options = c("striped", "scale_down",  "hold_position"))
+```
+
+```{r}
+# Salvando tabelas
+tabelas_bayes <- vector(mode = "list", length = length(output))
+for(i in seq_along(output)){
+  tabelas_bayes[[i]] <- faz_tab_bayes(samp[[i]], output[[i]]$real, length(output[[i]]$real$beta))
+}
+
+```
+
+```{r}
+#| label: tbl-panorama_bayes
+#| tbl-cap: "Tabelas com as estimações dos 4 cenários de estudo"
+#| tbl-subcap: 
+#|   - "(a) Cenário 1"
+#|   - "(b) Cenário 2"
+#|   - "(c) Cenário 3"
+#|   - "(d) Cenário 4"
+#| layout-ncol: 2
+#| layout-nrow: 2
+
+library(knitr)
+
+kbl(tabelas_bayes[[1]], booktabs = T)%>% 
+      kable_styling(latex_options = c("striped", "scale_down",  "hold_position"))
+
+kbl(tabelas_bayes[[2]], booktabs = T)%>% 
+      kable_styling(latex_options = c("striped", "scale_down",  "hold_position"))
+
+kbl(tabelas_bayes[[3]], booktabs = T)%>% 
+      kable_styling(latex_options = c("striped", "scale_down",  "hold_position"))
+
+kbl(tabelas_bayes[[4]], booktabs = T)%>% 
+      kable_styling(latex_options = c("striped", "scale_down",  "hold_position"))
+
+```
+
+Iniciando em nossa análise a @tbl-panorama_bayes contém um resumo dos resultados obtidos em todos os cenários. É possível entender, observando (a) e (b) que aumentar o tamanho da amostra melhora siginificativamente a estimação. Note que em (a) apenas beta2 não está contido nos HPD's ao passo que em (b) os HPD's cotém todos os valores reais. Tal fato é ilustrado pela @fig-plot1. Além disso, obseve como as estimativas da média *a posteriori* para cada beta se aproximou mais dos valores reais. Nota-se que para beta0 obteu-se uam estimação de 1.25 pelo cenário (b) ao passo que essa estimativa era 1.53 em (a), ou seja, mais próxima. Isso, contudo, não singifica que a estimação ao aumentar a amostra foi pior pois, em (b) observa-se que o desvio padrão diminuiu consideravelmente não só para beta0 mas também para todos os outros. Isso significa que, em (b), temos mais certeza sobre nossa estimação. Outro fator que corrobora esse fato é a diminuição da amplitude dos HPD's. Logo, a conclusão é: aumentar o tamnho amostral melhora siginificativamente a qualidade da estimação.
+
+Agora, procede-se para o estudo da estimação usando logit e probit. No item (a) da mesma tabela usou-se logit ao passo que, em (b) foi usado probit. Não há grandes diferenças entre a estimação pelos dois métodos de modo que não é possível concluir, de maneira acertiva, que um é indubitavelmente melhor do que outro. Pelo função logit temos que o verdadeiro valor de beta2 ligeiramente fora do intervalo HPD, contudo isso não pode ser considerado uma desvantegem uma vez que a amplidtude dos HPD'S em (a) e (d) são muito similares bem como as medidas dos respectivos desvios-padrão. A @fig-plot4 ilustra essa observação.
+
+O próximo objeto da análise será o estudo de desbalanceamento da convariável $X_1$. Faremos comparações entre os itens (a) e (c) da @tbl-panorama_bayes. No item (a) temos a probabilidade 0.5, logo é esperado um certo equilíbrio entre o número de zeros e de ums. Em (c), contudo, causamos uma perturbação nesse equilíbrio ao usar a probabilidade 0.1, ou seja, espera-se uma presença muito pequena de zeros na covariável $X_1$. Fixado o tamanho amostral, é possível observar grande piora na estimação do parâmetro beta1 que foi de aproximadamente 0.25 para 0.09. Atenta-se também para o fato de que o desvio-padrão subiu consideravelmente, de 0.3888 para 0.7552, reflentido o aumento da incerteza da estimação. Outro fato que reforça essa maior incerteza é o aumento vertiginoso da aplitude do HPD, ilustrado pela @fig-plot3 item (b). Conclui-se, portanto, que o modelo não se comporta bem quando há um grande debalanceamento entre o número de zeros e o de ums.
+
+## Bayesiana vs frequentista
+
+Finalmente, nesta sessão, o objetivo é estudar a comparação entre a inferência Bayesiana e a clássica. A @tbl-bayes_classic mostra os resultados para ambas, usando uma amostra de tamaho 200, função de ligação probit e $P(X_1=x)=0.5$. As estimativas pontuais para cada beta bem como os desvios-padrão e amplitude dos intervalos de confiança para ambos os métodos é muito similar. A @fig-plot2 o comportamento desses intervalos. Não é, portanto, razoável dizer que um método se sobressai em detrimento de outro de modo que, ambos são equivalentes.
+
+```{r}
+#| label: tbl-bayes_classic
+#| tbl-cap: "Tabelas com as estimações dos 4 cenários de estudo"
+#| tbl-subcap: 
+#|   - "(a) Método Bayesiano"
+#|   - "(b) Método Bayesiano"
+#| layout-ncol: 1
+#| layout-nrow: 2
+
+x <- output[[1]]$x
+
+y <- output[[1]]$y
+
+beta <- output[[1]]$real$beta
+
+q <- length(output[[1]]$real$beta)
+
+df <- data.frame(x, y)
+
+mod <- glm(y~. -X1, family = binomial(link = "logit"), data = df)
+
+tab_classica <- list(faz_tab_classica(mod, q))
+
+ic <- calcula_ic(mod, beta)
+
+tab_classica[[1]] <- cbind(tab_classica[[1]], ic$li, ic$ls, abs(ic$ls - ic$li))
+
+colnames(tab_classica[[1]]) <- c("Estimate", "Std. Error", "z value", 
+                                 "Pr(>|z|)", "IC_inf", "IC_sup", "Amplitude")
+
+kbl(tabelas_bayes[[1]], booktabs = T)%>% 
+      kable_styling(latex_options = c("striped", "scale_down",  "hold_position"))
+
+kbl(tab_classica[[1]], booktabs = T)%>% 
+      kable_styling(latex_options = c("striped", "scale_down",  "hold_position"))
+
+
+```
+
+## Estudo de mudança de Categoria
+
+Nesta sessão, faremos um estudo do que ocorre ao mudarmos de categoria. Partiremos da função de ligação fazendo as seguintes operações
+
+$$ln(\frac{\theta_i}{1-\theta_i})=\beta_0+\beta_1X_{1i}+\beta_2X_{2i}+\beta_3X_{3i}+\beta_4X_{4i}$$ $$\frac{\theta_i}{1-\theta_i}=exp(\beta_0+\beta_1X_{1i}+\beta_2X_{2i}+\beta_3X_{3i}+\beta_4X_{4i})$$ Onde $\frac{\theta_i}{1-\theta_i}$ é chamado de *odds ratio* e é definida como a probabilidade de sucesso sobre a probobabilidade de fracasso. Então, de modo geral, fixando as demais covariáveis e alterando apenas a covariável *i*, tem-se
+
+$$100\times (exp(\beta_i) - 1)$$ é o aumento percentual médio que se tem, na *odds ratio*, ao mudar a categoria da varável $X_i$, se essa variável for categórica ou binária. Já, se a variável *i* for contínua tem-se
+
+$$100\times (exp(k\beta_i) - 1)$$ onde *k* é uma constante real que representará o aumeto na covariável $X_i$, ou seja, fixada as outras variáveis, promovemos um aumento de *k* na variável $X_i$. Para fins deste estudo, foi usado *k=0.1*.
+
+Convém resslatar algumas observação sobre a *odds* que enunciamos abaixo
+
+1.  Se $\theta_i=0.5$ e $1-\theta_i=0.5$ então tem-se $\frac{\theta_i}{1-\theta_i}=1$
+
+2.  Se $\theta_i>0.5$ e $1-\theta_i<0.5$ então tem-se $\frac{\theta_i}{1-\theta_i}>1$
+
+3.  Se $\theta_i<0.5$ e $1-\theta_i>0.5$ então tem-se $0<\frac{\theta_i}{1-\theta_i}<1$
+
+No segundo caso, implica que teremos mais sucessos do que fracassos e, no terceiro caso, ocorre a situação inversa.
+
+```{r}
+#| label: tbl-exp1
+#| tbl-cap: "Tabela com o aumento pela mudança de categoria"
+estimativas <- tabelas_bayes[[1]][,2]
+exponencial <- round(c(NA, 100*(exp(estimativas[2]) - 1), 100*(exp(0.1*estimativas[3:5]) - 1)), 2)
+tab_exp <- cbind(tabelas_bayes[[1]], "Aumento" = exponencial)
+kbl(tab_exp, booktabs = T)%>% 
+      kable_styling(latex_options = c("striped", "scale_down",  "hold_position"))
+```
+
+A @tbl-exp1 mostra os resultados do estudo acima explicado para n = 200. Dela podemos interpretar, por exemplo, que quando a variável binária $X_1$ muda da categoria zero para a categoria 1, ocorre um aumento de 29.15% na *odds*. Já para variáveis contínuas, como é o caso da $X_2$, a interpretação é um pouco diferente. Sobre ela, pode-se afirmar que quando $X_2$ é aumentada em 0.1 unidade, ocorre uma dimiuição de 12.25% na *odds*. A mesma interpretação se aplica as covariáveis $X_3$ e $X_4$.
+
+# Gráficos
+
+```{r}
+#| label: fig-plot1
+#| fig-cap: "Estudo do efeito do tamanho amostral na qualidade da estimação bayesiana"
+#| fig-subcap: 
+#|   - "Bayes n = 200"
+#|   - "Bayes n = 1000"
+#| layout-ncol: 2
+{plotCI(x = 0:4, y = tabelas_bayes[[1]][,2], ui = tabelas_bayes[[1]][,6], 
+        li = tabelas_bayes[[1]][,5], xlab = "beta", ylab = "Estimativa", 
+        lwd = 2, ylim = c(-2, 2.2))
+points(x = 0:4, y = beta, col = "red", pch = 4, lwd = 2)}
+
+{plotCI(x = 0:4, y = tabelas_bayes[[2]][,2], ui = tabelas_bayes[[2]][,6], 
+        li = tabelas_bayes[[2]][,5], xlab = "beta", ylab = "Estimativa", 
+        lwd = 2, ylim = c(-2, 2.2))
+points(x = 0:4, y = beta, col = "red", pch = 4, lwd = 2)}
+```
+
+```{r}
+#| label: fig-plot2
+#| fig-cap: "Comparação baysino vs frequentista"
+#| fig-subcap: 
+#|   - "Método Bayesiano"
+#|   - "Método Frequentista"
+#| layout-ncol: 2
+
+{plotCI(x = 0:4, y = tabelas_bayes[[1]][,2], ui = tabelas_bayes[[1]][,6], 
+        li = tabelas_bayes[[1]][,5], xlab = "beta", ylab = "Estimativa", 
+        lwd = 2, ylim = c(-2, 2.2))
+points(x = 0:4, y = beta, col = "red", pch = 4, lwd = 2)}
+
+{plotCI(x = 0:4, y = tab_classica[[1]][,1], ui = ic$ls, li = ic$li, 
+        xlab = "beta", ylab = "Estimativa", lwd = 2, ylim = c(-2, 2.2))
+points(x = 0:4, y = beta, col = "red", pch = 4, lwd = 2)}
+
+
+
+```
+
+```{r}
+#| label: fig-plot3
+#| fig-cap: "Estudo do desbalanceamento da covariável x1 pelo método bayesiano"
+#| fig-subcap: 
+#|   - "n = 200 e Pr(X2=x) = 0.5"
+#|   - "n = 200 e Pr(X2=x) = 0.1"
+#| layout-ncol: 2
+
+{plotCI(x = 0:4, y = tabelas_bayes[[1]][,2], ui = tabelas_bayes[[1]][,6], 
+        li = tabelas_bayes[[1]][,5], xlab = "beta", ylab = "Estimativa", 
+        lwd = 2, ylim = c(-2, 2.2))
+points(x = 0:4, y = beta, col = "red", pch = 4, lwd = 2)}
+
+{plotCI(x = 0:4, y = tabelas_bayes[[3]][,2], ui = tabelas_bayes[[3]][,6], 
+        li = tabelas_bayes[[3]][,5], xlab = "beta", ylab = "Estimativa", 
+        lwd = 2, ylim = c(-2, 2.2))
+points(x = 0:4, y = beta, col = "red", pch = 4, lwd = 2)}
+```
+
+```{r}
+#| label: fig-plot4
+#| fig-cap: "Comparação logit vs probit pelo método bayesiano"
+#| fig-subcap: 
+#|   - "n = 200 e logit"
+#|   - "n = 200 e probit"
+#| layout-ncol: 2
+
+{plotCI(x = 0:4, y = tabelas_bayes[[1]][,2], ui = tabelas_bayes[[1]][,6], 
+        li = tabelas_bayes[[1]][,5], xlab = "beta", ylab = "Estimativa", 
+        lwd = 2, ylim = c(-2, 2.2))
+points(x = 0:4, y = beta, col = "red", pch = 4, lwd = 2)}
+
+{plotCI(x = 0:4, y = tabelas_bayes[[4]][,2], ui = tabelas_bayes[[4]][,6], 
+        li = tabelas_bayes[[4]][,5], xlab = "beta", ylab = "Estimativa", 
+        lwd = 2, ylim = c(-2, 2.2))
+points(x = 0:4, y = beta, col = "red", pch = 4, lwd = 2)}
+```
