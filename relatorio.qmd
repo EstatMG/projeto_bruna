@@ -203,4 +203,66 @@ amostras_bruno_ej <- faz_amostra(df_ej, tamanhos_amostrais)
 amostras_bruno_ln <- faz_amostra(df_ln, tamanhos_amostrais)
 ```
 
+```{r}
+nomes_op <- c(
+  "O Desconhecido", "O Homem Racional", "Óh!cast", "Opressorando Red Pill", "Ovelha Negra",
+  "Owlk", "Papo de Macho", "PAPO MILGRAU", "Pastafarian", "Peralta DuasPika",
+  "Peste Negra", "Pílula Vermelha", "PINK & PILL", "Platinho",
+  "Platinho BRs Renegados do Algo", "Podcast 3 irmãos", "Podcast do Andarilho   BlankCas",
+  "Podcast Falando Sozinho", "PODCAST VOZ DA REAL", "Podcolar Podcast", "Poder Constituinte",
+  "PodPill", "PodSexy", "Porcaria&Podcast", "PROCAST", "Programa Subset",
+  "Psicologia e Desenvolvimento Co"
+)
+
+tamanhos_amostra_op <- c(
+  8, 5, 35, 2, 33, 12, 10, 14, 13, 21, 3, 4, 8, 28, 19, 74, 7, 30, 16, 18, 44, 4, 13, 16, 3, 9, 118
+)
+
+amostras_op <- list()
+
+nomes_dataframes_op <- names(df_op)
+
+for (i in 1:length(nomes_dataframes_op)) {
+  nome_df_op <- nomes_dataframes_op[i]
+  tamanho_amostra_op <- tamanhos_amostra_op[i]
+  
+  amostra_op <- df_op[[nome_df_op]][sample(nrow(df_op[[nome_df_op]]), size = tamanho_amostra_op, replace = FALSE), ]
+  amostras_op[[nome_df_op]] <- amostra_op
+}
+
+```
+
+```{r}
+nomes_rs <- c(
+  "Raccooning Raccoon", "RandomCast", "Ratão do Banhado", "Red Cast", "Rede Podrecast", "Redpill Reuploud", "Redpill show", "Ricardo Ferrer", "Rick Favorite",
+  "Samurai Redpill", "SB João Victor ----> N.A.V.E.", "Sem Groselha Podcast", "SharkCast",
+  "Shock Wave Radio", "Sintaxe Podcast", "Sobrevivendo ao Divórcio", "Social Arts", "Social Games 7",
+  "SocialPro", "Sociedade Primitiva Podcast", "Solteirão Convicto MGTOW", "Soren Cast",
+  "Submundo Intelectual", "Subsolo"
+)
+
+tamanhos_amostra_rs <- c(
+  25, 4, 40, 1, 5, 6, 1, 1, 250, 1, 1, 52, 45, 4, 29, 2, 6, 198, 94, 11, 80, 6, 2, 55, 3
+)
+
+amostras_rs <- list()
+
+nomes_dataframes_rs <- names(df_rs)
+
+for (i in 1:length(nomes_dataframes_rs)) {
+  nome_df_rs <- nomes_dataframes_rs[i]
+  tamanho_amostra_rs <- tamanhos_amostra_rs[i]
+  
+  amostra_rs <- df_rs[[nome_df_rs]][sample(nrow(df_rs[[nome_df_rs]]), size = tamanho_amostra_rs, replace = FALSE), ]
+  amostras_rs[[nome_df_rs]] <- amostra_rs
+}
+
+```
+
+```{r}
+library(openxlsx)
+write.xlsx(amostras_op, "amostras_op.xlsx")
+write.xlsx(amostras_rs, "amostras_rs.xlsx")
+```
+
 
