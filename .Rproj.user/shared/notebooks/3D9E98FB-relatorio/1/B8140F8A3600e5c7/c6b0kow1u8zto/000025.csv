@@ -1,3 +1,0 @@
-"0","nh2_linha <- ceiling(Wh_linha*3806)"
-"0","df_resumo2_linha <- data.frame(""Estratos""=dados$Podcast, ""Tamanho de amostra""=nh2_linha)"
-"0","kable(head(df_resumo2_linha, n = 10))"

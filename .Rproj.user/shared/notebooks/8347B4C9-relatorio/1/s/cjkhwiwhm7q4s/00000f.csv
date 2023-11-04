@@ -1,4 +1,0 @@
-"0","dados <- read_excel(""data/Contagem podcasts.xlsx"")"
-"0","dados <- dados[-nrow(dados), -ncol(dados)]"
-"0","dados <- dados[,-1]"
-"0","dados_numeros <- dados[,-1]"

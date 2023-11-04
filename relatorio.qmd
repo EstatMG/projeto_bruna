@@ -4,7 +4,7 @@ execute:
   echo: false
   warning: false
 format: pdf
-editor: visual
+editor: source
 ---
 
 # Bibliotecas
@@ -24,7 +24,7 @@ separa_planilha <- function(file_path){
   sheet_names <- excel_sheets(file_path)
   data_frames <- list()
   for (sheet_name in sheet_names){
-    data_frames[[sheet_name]] <- read_excel(file_path, sheet = sheet_name)
+    data_frames[[sub("\\s+$", "", sheet_name)]] <- read_excel(file_path, sheet = sheet_name)
   }
   return(data_frames)
 }
@@ -38,9 +38,37 @@ limpa_indices <- function(data_frame_list){
   }
   return(data_frame_list)
 }
+
+
+faz_amostra <- function(df, tab_tamanhos){
+  
+  amostras <- list()
+  
+  for (i in 1:length(df)) {
+    for (j in 1:nrow(tab_tamanhos)) {
+      if (names(df)[i] == tab_tamanhos$Estratos[j]) {
+        column_name <- names(df)[i]
+        sampled_indices <- sample(nrow(df[[column_name]]), size = tab_tamanhos$Tamanho.de.amostra[j], replace = FALSE)
+        amostras[[column_name]] <- df[[column_name]][sampled_indices, ]
+      }
+    }
+  }
+  
+  return(amostras)
+  
+}
+
+
+
+
 ```
 
 # Saneamento dos dados
+
+```{r}
+tamanhos_amostrais <- read_excel("data/Tamanho amostral de cada grupo.xlsx") 
+```
+
 
 ```{r}
 dados <- read_excel("data/Contagem podcasts.xlsx")
@@ -161,3 +189,18 @@ df_resumo<- data.frame("Estratos"=dados$Podcast, "Tamanho de amostra"=nh)
 A cliente aceitou um erro de 3.70037, que resulta em um tamanho amostra de 3781 que, arrendodado par acima quando fazemos a conta com as proporções, resulta em 3852.A tabela **"Tamanho amostral de cada grupo"**, do google drive, mostra quanto de tamanho amostral devemos returar de cada podcast.
 
 # Coleta das amostras
+
+```{r}
+names(df_ej)[names(df_ej) == "Isentões Podcast Deserto de Ide"] <- "Isentões Podcast Deserto de Ideias"  
+names(df_ej)[names(df_ej) == "Gabriel Orcioli Homem Superior"] <- "Gabriel Orcioli Homem Superior Podcast"
+# names(df_ej) <- sub("\\s+$", "", names(df_ej))
+
+```
+
+```{r}
+set.seed(123456789)
+amostras_bruno_ej <- faz_amostra(df_ej, tamanhos_amostrais)
+amostras_bruno_ln <- faz_amostra(df_ln, tamanhos_amostrais)
+```
+
+
